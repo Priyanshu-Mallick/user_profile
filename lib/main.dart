@@ -1,7 +1,7 @@
-// import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'bookdetails.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -131,26 +131,42 @@ class _UserFormDataState extends State<UserFormData> {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16.0),
-                child: ElevatedButton(
-                  onPressed: () async {
-                    if (_formKey.currentState!.validate()) {
-                      _formKey.currentState!.save();
-                      // save data to Firebase
-                      Map<String,dynamic> data={
-                        'name': _name,
-                        'age': _age,
-                        'bio': _bio,
-                        'interests': _interests,
-                        'profession': _profession,};
-                      FirebaseFirestore.instance.collection("Users").add(data);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('User data saved'),
-                        ),
-                      );
-                    }
-                  },
-                  child: const Text('Save'),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton(
+                      onPressed: () async {
+                        if (_formKey.currentState!.validate()) {
+                          _formKey.currentState!.save();
+                          // save data to Firebase
+                          Map<String,dynamic> data={
+                            'name': _name,
+                            'age': _age,
+                            'bio': _bio,
+                            'interests': _interests,
+                            'profession': _profession,
+                          };
+                          FirebaseFirestore.instance.collection("Users").add(data);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('User data saved'),
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text('Save'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => BookDetails()),
+
+                        );
+                      },
+                      child: const Text('Book Deatils'),
+                    ),
+                  ],
                 ),
               ),
             ],
