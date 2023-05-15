@@ -1,8 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:user_profile/services/auth_service.dart';
 import 'bookdetails.dart';
+import 'chat_room.dart';
 import 'firebase_options.dart';
+import 'package:flutter_icons/flutter_icons.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,6 +47,8 @@ class _UserFormDataState extends State<UserFormData> {
   late String _bio;
   late String _interests;
   late String _profession;
+
+  get floatingActionButton => null;
 
   @override
   Widget build(BuildContext context) {
@@ -172,6 +179,39 @@ class _UserFormDataState extends State<UserFormData> {
             ],
           ),
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext context) {
+              return WillPopScope(
+                onWillPop: () async => false, // Disable popping with back button
+                child: Center(
+                  child: SpinKitFadingCircle(
+                    color: Theme.of(context).primaryColor,
+                    size: 50.0,
+                  ),
+                ),
+              );
+            },
+          );
+          final user = await AuthService().signInWithGoogle();
+          Navigator.pop(context); // Close the buffering animation dialog
+          if (user != null) {
+            final displayName = await AuthService().getUserDisplayName();
+            final userName = await AuthService().getUniqueUsername(displayName!);
+            await AuthService().storeUserDisplayName(displayName!, userName);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ChatRooms(),
+              ),
+            );
+          }
+        },
+        child: const Icon(Feather.message_square), // Use the chat icon from the Flutter Icons package
       ),
     );
   }
