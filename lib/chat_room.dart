@@ -1,10 +1,13 @@
+// import 'dart:html';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:easy_debounce/easy_debounce.dart';
 import 'package:user_profile/services/Topic.dart';
-
+import 'package:image_picker/image_picker.dart';
 import 'chat_screen.dart';
 
 class ChatRooms extends StatefulWidget {
@@ -216,43 +219,97 @@ class _ChatRoomsState extends State<ChatRooms> {
             builder: (BuildContext context) {
               String name = '';
               String description = '';
-              return AlertDialog(
-                title: const Text('Add Chatroom'),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      decoration: const InputDecoration(
-                        labelText: 'Topic Name',
-                      ),
-                      onChanged: (value) {
-                        name = value;
-                      },
-                    ),
-                    TextField(
-                      decoration: const InputDecoration(
-                        labelText: 'Topic Description',
-                      ),
-                      onChanged: (value) {
-                        description = value;
-                      },
-                    ),
-                  ],
+              File? image;
+
+              // Function to handle selecting a new image for the profile picture
+              Future<void> _pickImage() async {
+                final pickedFile = await ImagePicker().getImage(
+                  source: ImageSource.gallery,
+                );
+
+                setState(() {
+                  if (pickedFile != null) {
+                    image = File(pickedFile.path);
+                  } else {
+                    print('No image selected.');
+                  }
+                });
+              }
+
+              return Dialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20.0),
                 ),
-                actions: [
-                  ElevatedButton(
-                    onPressed: () {
-                      addTopic(name, description);
-                    },
-                    child: const Text('Save'),
+                child: Container(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Stack(
+                        children: [
+                          CircleAvatar(
+                            // Display the selected image if available, otherwise show the default icon
+                            backgroundImage: image != null ? FileImage(image!) : null,
+                            radius: 50.0,
+                            child: image == null ? const Icon(Icons.person) : null,
+                          ),
+                          Positioned(
+                            bottom: 0.0,
+                            right: 0.0,
+                            child: GestureDetector(
+                              onTap: () {
+                                _pickImage();
+                              },
+                              child: CircleAvatar(
+                                backgroundColor: Colors.white,
+                                radius: 20.0,
+                                child: Icon(
+                                  Icons.edit,
+                                  color: Colors.grey[800],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16.0),
+                      TextField(
+                        decoration: const InputDecoration(
+                          labelText: 'Topic Name',
+                        ),
+                        onChanged: (value) {
+                          name = value;
+                        },
+                      ),
+                      TextField(
+                        decoration: const InputDecoration(
+                          labelText: 'Topic Description',
+                        ),
+                        onChanged: (value) {
+                          description = value;
+                        },
+                      ),
+                      SizedBox(height: 16.0),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () {
+                              addTopic(name, description);
+                            },
+                            child: const Text('Save'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context); // Close the dialog without saving
+                            },
+                            child: const Text('Cancel'),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context); // Close the dialog without saving
-                    },
-                    child: const Text('Cancel'),
-                  ),
-                ],
+                ),
               );
             },
           );
