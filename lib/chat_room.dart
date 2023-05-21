@@ -1,6 +1,5 @@
 // import 'dart:html';
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -9,6 +8,9 @@ import 'package:easy_debounce/easy_debounce.dart';
 import 'package:user_profile/services/Topic.dart';
 import 'package:image_picker/image_picker.dart';
 import 'chat_screen.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
+
 
 class ChatRooms extends StatefulWidget {
   const ChatRooms({Key? key});
@@ -98,6 +100,34 @@ class _ChatRoomsState extends State<ChatRooms> {
       }).toList();
     }
   }
+
+  Future<void> _selectAndCropImage() async {
+    final pickedFile = await ImagePicker().getImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: pickedFile.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1), // Adjust the aspect ratio as needed
+        compressQuality: 70, // Adjust the compression quality as needed
+        maxWidth: 800, // Adjust the maximum width as needed
+        maxHeight: 800, // Adjust the maximum height as needed
+      );
+
+      if (croppedFile != null) {
+        // Upload the cropped image to Firebase Storage
+        final storageRef = firebase_storage.FirebaseStorage.instance.ref().child('groupicon').child(DateTime.now().millisecondsSinceEpoch.toString());
+        final uploadTask = storageRef.putFile(File(croppedFile.path));
+
+        // Get the download URL of the uploaded image
+        final snapshot = await uploadTask.whenComplete(() {});
+        final downloadURL = await snapshot.ref.getDownloadURL();
+
+        // Store the download URL in Firestore
+        final chatRoomRef = FirebaseFirestore.instance.collection('chatrooms').doc(FirebaseAuth.instance.currentUser?.uid);
+        chatRoomRef.update({'groupicon': downloadURL});
+      }
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -258,7 +288,7 @@ class _ChatRoomsState extends State<ChatRooms> {
                             right: 0.0,
                             child: GestureDetector(
                               onTap: () {
-                                _pickImage();
+                                // _selectAndCropImage();
                               },
                               child: CircleAvatar(
                                 backgroundColor: Colors.white,
