@@ -9,7 +9,6 @@ class ChatScreen extends StatefulWidget {
   final Topic topic;
   final String username;
 
-
   const ChatScreen({required this.topic, required this.username});
 
   @override
@@ -19,6 +18,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   List<Message> messages = [];
   late FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   TextEditingController messageController = TextEditingController();
 
   @override
@@ -43,7 +43,11 @@ class _ChatScreenState extends State<ChatScreen> {
       );
 
       // Store the encrypted message in Firestore
-      await _firestore.collection('messages').add({
+      await _firestore
+          .collection('chatrooms')
+          .doc(widget.topic.id)
+          .collection('messages')
+          .add({
         'content': message.content,
         'sender': message.sender,
         'timestamp': message.timestamp,
@@ -97,7 +101,12 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: _firestore.collection('messages').snapshots(),
+              stream: _firestore
+                  .collection('chatrooms')
+                  .doc(widget.topic.id)
+                  .collection('messages')
+                  .orderBy('timestamp', descending: true)
+                  .snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return Center(child: CircularProgressIndicator());
@@ -126,18 +135,46 @@ class _ChatScreenState extends State<ChatScreen> {
 
                     return Align(
                       alignment: isSender ? Alignment.centerRight : Alignment.centerLeft,
+
                       child: Container(
-                        padding: EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(8),
                         margin: const EdgeInsets.symmetric(vertical: 4),
                         decoration: BoxDecoration(
                           color: isSender ? Colors.blue : Colors.grey.shade300,
                           borderRadius: BorderRadius.circular(8),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black26,
+                              offset: Offset(0, 2),
+                              blurRadius: 2,
+                            ),
+                          ],
                         ),
-                        child: Text(
-                          message.content,
-                          style: TextStyle(
-                            color: isSender ? Colors.white : Colors.black,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              message.sender,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[800],
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              message.content,
+                              style: TextStyle(
+                                color: isSender ? Colors.white : Colors.black,
+                              ),
+                            ),
+                            Text(
+                              '${message.timestamp}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     );
@@ -166,6 +203,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   onPressed: () => sendMessage(messageController.text),
                   child: const Icon(Icons.send),
                 ),
+
+
               ],
             ),
           ),
