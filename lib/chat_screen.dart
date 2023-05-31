@@ -4,6 +4,8 @@ import 'package:user_profile/services/Topic.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import 'dart:math';
 
 class ChatScreen extends StatefulWidget {
   final Topic topic;
@@ -79,6 +81,17 @@ class _ChatScreenState extends State<ChatScreen> {
     return decrypted; // Return the decrypted content
   }
 
+  Color generateRandomColor() {
+    final random = Random();
+    return Color.fromARGB(
+      255,
+      random.nextInt(256),
+      random.nextInt(256),
+      random.nextInt(256),
+    );
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -132,50 +145,64 @@ class _ChatScreenState extends State<ChatScreen> {
                   itemBuilder: (context, index) {
                     Message message = messages[index];
                     bool isSender = message.sender == widget.username;
+                    bool isFirstMessageFromSender = index == messages.length - 1 || messages[index + 1].sender != message.sender;
+                    bool shouldShowUserId = !isSender && isFirstMessageFromSender;
+                    Color? senderColor;
+                    if (!isSender && isFirstMessageFromSender) {
+                      senderColor = generateRandomColor();
+                    }
 
                     return Align(
                       alignment: isSender ? Alignment.centerRight : Alignment.centerLeft,
-
                       child: Container(
-                        padding: const EdgeInsets.all(8),
-                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        padding: const EdgeInsets.all(10),
+                        margin: isFirstMessageFromSender ? const EdgeInsets.symmetric(vertical: 5) : const EdgeInsets.symmetric(vertical: 2),
+                        constraints: BoxConstraints(maxWidth: 250),
                         decoration: BoxDecoration(
                           color: isSender ? Colors.blue : Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.only(
+                            topLeft: isSender ? Radius.circular(15) : Radius.circular(isFirstMessageFromSender ? 0 : 15),
+                            topRight: Radius.circular(15),
+                            bottomLeft: Radius.circular(15),
+                            bottomRight: isSender ? Radius.circular(isFirstMessageFromSender ? 0 : 15) : Radius.circular(15),
+                          ),
                           boxShadow: const [
                             BoxShadow(
                               color: Colors.black26,
-                              offset: Offset(0, 2),
-                              blurRadius: 2,
+                              offset: Offset(0, 1),
+                              blurRadius: 1,
                             ),
                           ],
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              message.sender,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[800],
+                          child: Column(
+                            crossAxisAlignment: isSender ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                            children: [
+                              if (shouldShowUserId)
+                                Text(
+                                  message.sender,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: senderColor,
+                                  ),
+                                ),
+                              const SizedBox(height: 2),
+                              Text(
+                                message.content,
+                                style: TextStyle(
+                                  color: isSender ? Colors.white : Colors.black,
+                                  fontSize: 16,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              message.content,
-                              style: TextStyle(
-                                color: isSender ? Colors.white : Colors.black,
+                              Text(
+                                DateFormat.jm().format(message.timestamp), // Show only time
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[500],
+                                ),
                               ),
-                            ),
-                            Text(
-                              '${message.timestamp}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ],
-                        ),
+                            ],
+                          )
                       ),
                     );
                   },
@@ -184,7 +211,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(5),
             child: Row(
               children: [
                 Expanded(
@@ -198,13 +225,11 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 10),
                 FloatingActionButton(
                   onPressed: () => sendMessage(messageController.text),
                   child: const Icon(Icons.send),
                 ),
-
-
               ],
             ),
           ),
