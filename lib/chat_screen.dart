@@ -1,4 +1,9 @@
+import 'dart:html';
+
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:user_profile/services/Message.dart';
 import 'package:user_profile/services/Topic.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
@@ -22,18 +27,60 @@ class _ChatScreenState extends State<ChatScreen> {
   late FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   TextEditingController messageController = TextEditingController();
+  bool isTyping = false;
 
+  // For firebase state management
   @override
   void initState() {
     super.initState();
     initializeFirebase();
   }
 
+  // For Open Camera
+  Future<void> openCamera() async {
+    final picker = ImagePicker();
+    final pickedImage = await picker.getImage(source: ImageSource.camera);
+    if (pickedImage != null) {
+      final croppedImage = await cropImage(pickedImage.path);
+      if (croppedImage != null) {
+        // Process the cropped image here
+        // You can store it, upload it, etc.
+        // Example:
+        final imagePath = croppedImage.path;
+        // Do something with the image path
+      }
+    }
+  }
+
+  // For image crop
+  Future<CroppedFile?> cropImage(String imagePath) async {
+    final imageCropper = ImageCropper();
+    final croppedImage = await imageCropper.cropImage(
+      sourcePath: imagePath,
+      aspectRatio: CropAspectRatio(ratioX: 1, ratioY: 1),
+      androidUiSettings: AndroidUiSettings(
+        toolbarTitle: 'Crop Image',
+        toolbarColor: Colors.deepOrange,
+        toolbarWidgetColor: Colors.white,
+        initAspectRatio: CropAspectRatioPreset.original,
+        lockAspectRatio: false,
+      ),
+      iosUiSettings: IOSUiSettings(
+        title: 'Crop Image',
+      ),
+    );
+    return croppedImage;
+  }
+
+
+
+  // Initialize the firebase
   Future<void> initializeFirebase() async {
     await Firebase.initializeApp();
     _firestore = FirebaseFirestore.instance;
   }
 
+  // For Sending Message
   void sendMessage(String content) async {
     if (content.isNotEmpty) {
       final encryptedContent = encryptContent(content); // Encrypt message content
@@ -58,10 +105,12 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         messages.add(message);
         messageController.clear();
+        isTyping = false;
       });
     }
   }
 
+  // For encrypting message
   String encryptContent(String content) {
     // Use your encryption algorithm of choice to encrypt the message content
     final key = encrypt.Key.fromLength(32);
@@ -71,6 +120,7 @@ class _ChatScreenState extends State<ChatScreen> {
     return encrypted.base64; // Return the encrypted content as a string
   }
 
+  // For decrypting message
   String decryptContent(String encryptedContent) {
     // Use your encryption algorithm of choice to decrypt the message content
     final key = encrypt.Key.fromLength(32);
@@ -81,6 +131,7 @@ class _ChatScreenState extends State<ChatScreen> {
     return decrypted; // Return the decrypted content
   }
 
+  // For random color generation for random userid color
   Color generateRandomColor() {
     final random = Random();
     return Color.fromARGB(
@@ -90,7 +141,6 @@ class _ChatScreenState extends State<ChatScreen> {
       random.nextInt(256),
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -129,7 +179,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 final messageDocs = snapshot.data!.docs;
                 messageDocs.forEach((messageDoc) {
                   final data = messageDoc.data() as Map<String, dynamic>;
-                  final decryptedContent = decryptContent(data['content'] as String);
+                  final decryptedContent =
+                  decryptContent(data['content'] as String);
                   final message = Message(
                     content: decryptedContent,
                     sender: data['sender'] as String,
@@ -139,43 +190,56 @@ class _ChatScreenState extends State<ChatScreen> {
                 });
 
                 return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   itemCount: messages.length,
                   reverse: true,
                   itemBuilder: (context, index) {
                     Message message = messages[index];
                     bool isSender = message.sender == widget.username;
-                    bool isFirstMessageFromSender = index == messages.length - 1 || messages[index + 1].sender != message.sender;
-                    bool shouldShowUserId = !isSender && isFirstMessageFromSender;
+                    bool isFirstMessageFromSender = index == messages.length - 1 ||
+                        messages[index + 1].sender != message.sender;
+                    bool shouldShowUserId =
+                        !isSender && isFirstMessageFromSender;
                     Color? senderColor;
                     if (!isSender && isFirstMessageFromSender) {
                       senderColor = generateRandomColor();
                     }
 
                     return Align(
-                      alignment: isSender ? Alignment.centerRight : Alignment.centerLeft,
+                      alignment:
+                      isSender ? Alignment.centerRight : Alignment.centerLeft,
                       child: Container(
-                        padding: const EdgeInsets.all(10),
-                        margin: isFirstMessageFromSender ? const EdgeInsets.symmetric(vertical: 5) : const EdgeInsets.symmetric(vertical: 2),
-                        constraints: BoxConstraints(maxWidth: 250),
-                        decoration: BoxDecoration(
-                          color: isSender ? Colors.blue : Colors.grey.shade300,
-                          borderRadius: BorderRadius.only(
-                            topLeft: isSender ? Radius.circular(15) : Radius.circular(isFirstMessageFromSender ? 0 : 15),
-                            topRight: Radius.circular(15),
-                            bottomLeft: Radius.circular(15),
-                            bottomRight: isSender ? Radius.circular(isFirstMessageFromSender ? 0 : 15) : Radius.circular(15),
-                          ),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Colors.black26,
-                              offset: Offset(0, 1),
-                              blurRadius: 1,
+                          padding: const EdgeInsets.all(10),
+                          margin: isFirstMessageFromSender
+                              ? const EdgeInsets.symmetric(vertical: 5)
+                              : const EdgeInsets.symmetric(vertical: 2),
+                          constraints: BoxConstraints(maxWidth: 250),
+                          decoration: BoxDecoration(
+                            color: isSender ? Colors.blue : Colors.grey.shade300,
+                            borderRadius: BorderRadius.only(
+                              topLeft: isSender
+                                  ? Radius.circular(15)
+                                  : Radius.circular(
+                                  isFirstMessageFromSender ? 0 : 15),
+                              topRight: Radius.circular(15),
+                              bottomLeft: Radius.circular(15),
+                              bottomRight: isSender
+                                  ? Radius.circular(
+                                  isFirstMessageFromSender ? 0 : 15)
+                                  : Radius.circular(15),
                             ),
-                          ],
-                        ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black26,
+                                offset: Offset(0, 1),
+                                blurRadius: 1,
+                              ),
+                            ],
+                          ),
                           child: Column(
-                            crossAxisAlignment: isSender ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                            crossAxisAlignment:
+                            isSender ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                             children: [
                               if (shouldShowUserId)
                                 Text(
@@ -195,15 +259,15 @@ class _ChatScreenState extends State<ChatScreen> {
                                 ),
                               ),
                               Text(
-                                DateFormat.jm().format(message.timestamp), // Show only time
+                                DateFormat.jm()
+                                    .format(message.timestamp), // Show only time
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey[500],
                                 ),
                               ),
                             ],
-                          )
-                      ),
+                          )),
                     );
                   },
                 );
@@ -215,14 +279,33 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: messageController,
-                    decoration: InputDecoration(
-                      hintText: 'Type a message',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
+                  child: Stack(
+                    alignment: Alignment.centerRight,
+                    children: [
+                      TextField(
+                        controller: messageController,
+                        decoration: InputDecoration(
+                          hintText: 'Type a message',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
+                        onChanged: (text) {
+                          setState(() {
+                            isTyping = text.isNotEmpty;
+                          });
+                        },
                       ),
-                    ),
+                      Visibility(
+                        visible: !isTyping,
+                        child: IconButton(
+                          onPressed: () {
+                            openCamera(); // Open the camera when icon is clicked
+                          },
+                          icon: Icon(Icons.camera_alt),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 10),
