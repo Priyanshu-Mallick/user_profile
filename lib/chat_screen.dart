@@ -1,4 +1,4 @@
-import 'dart:html';
+// import 'dart:html';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -9,8 +9,11 @@ import 'package:user_profile/services/Topic.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'dart:math';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
 
 class ChatScreen extends StatefulWidget {
   final Topic topic;
@@ -41,37 +44,68 @@ class _ChatScreenState extends State<ChatScreen> {
     final picker = ImagePicker();
     final pickedImage = await picker.getImage(source: ImageSource.camera);
     if (pickedImage != null) {
-      final croppedImage = await cropImage(pickedImage.path);
-      if (croppedImage != null) {
-        // Process the cropped image here
-        // You can store it, upload it, etc.
-        // Example:
-        final imagePath = croppedImage.path;
-        // Do something with the image path
-      }
+      final File imageFile = File(pickedImage.path);
+
+      final firebaseStorageRef = FirebaseStorage.instance.ref().child('images/${DateTime.now().millisecondsSinceEpoch}.jpg');
+      final uploadTask = firebaseStorageRef.putFile(imageFile);
+
+      uploadTask.whenComplete(() {
+        if (uploadTask.snapshot.state == TaskState.success) {
+          firebaseStorageRef.getDownloadURL().then((downloadUrl) {
+            // Handle the download URL, e.g., store it in Firestore or display it to the user
+            print('Download URL: $downloadUrl');
+
+            final firestore = FirebaseFirestore.instance;
+            firestore
+                .collection('chatrooms') // Existing collection
+                .doc(widget.topic.id) // Document ID of the current topic
+                .collection('images') // New collection for images
+                .add({
+              'imageUrl': downloadUrl,
+              'sender': widget.username,
+              'timestamp': FieldValue.serverTimestamp(),
+            })
+                .then((value) {
+              Fluttertoast.showToast(
+                msg: 'Image uploaded successfully',
+                toastLength: Toast.LENGTH_SHORT,
+                gravity: ToastGravity.BOTTOM,
+                timeInSecForIosWeb: 1,
+                backgroundColor: Colors.green,
+                textColor: Colors.white,
+              );
+            })
+                .catchError((error) {
+              print('Error storing image URL: $error');
+            });
+          });
+        }
+      }).catchError((error) {
+        // Handle any errors that occur during the upload process
+        print('Error uploading image: $error');
+      });
     }
   }
 
   // For image crop
-  Future<CroppedFile?> cropImage(String imagePath) async {
-    final imageCropper = ImageCropper();
-    final croppedImage = await imageCropper.cropImage(
-      sourcePath: imagePath,
-      aspectRatio: CropAspectRatio(ratioX: 1, ratioY: 1),
-      androidUiSettings: AndroidUiSettings(
-        toolbarTitle: 'Crop Image',
-        toolbarColor: Colors.deepOrange,
-        toolbarWidgetColor: Colors.white,
-        initAspectRatio: CropAspectRatioPreset.original,
-        lockAspectRatio: false,
-      ),
-      iosUiSettings: IOSUiSettings(
-        title: 'Crop Image',
-      ),
-    );
-    return croppedImage;
-  }
-
+  // Future<CroppedFile?> cropImage(String imagePath) async {
+  //   final imageCropper = ImageCropper();
+  //   final croppedImage = await imageCropper.cropImage(
+  //     sourcePath: imagePath,
+  //     aspectRatio: CropAspectRatio(ratioX: 1, ratioY: 1),
+  //     androidUiSettings: AndroidUiSettings(
+  //       toolbarTitle: 'Crop Image',
+  //       toolbarColor: Colors.deepOrange,
+  //       toolbarWidgetColor: Colors.white,
+  //       initAspectRatio: CropAspectRatioPreset.original,
+  //       lockAspectRatio: false,
+  //     ),
+  //     iosUiSettings: IOSUiSettings(
+  //       title: 'Crop Image',
+  //     ),
+  //   );
+  //   return croppedImage;
+  // }
 
 
   // Initialize the firebase
@@ -267,7 +301,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                 ),
                               ),
                             ],
-                          )),
+                          )
+                      ),
                     );
                   },
                 );
