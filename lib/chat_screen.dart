@@ -32,6 +32,8 @@ class _ChatScreenState extends State<ChatScreen> {
   TextEditingController messageController = TextEditingController();
   bool isTyping = false;
 
+  File? imageFile;
+
   // For firebase state management
   @override
   void initState() {
@@ -39,79 +41,142 @@ class _ChatScreenState extends State<ChatScreen> {
     initializeFirebase();
   }
 
+  // Initialize the firebase
+  Future<void> initializeFirebase() async {
+    await Firebase.initializeApp();
+    _firestore = FirebaseFirestore.instance;
+  }
+
+  // Open dialog box with camera and image gallery options
+  void openImageDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Select Image Source'),
+          content: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () {
+                  // Send the image
+                  openCamera();
+                  Navigator.pop(context);
+                },
+                icon: Icon(Icons.camera),
+                label: Text('Camera'),
+              ),
+              ElevatedButton.icon(
+                onPressed: () {
+                  // Send the image
+                  openGallery();
+                  Navigator.pop(context);
+                },
+                icon: Icon(Icons.image),
+                label: Text('Gallery'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Open image overview after selecting image
+  void showImageOverview(File imageFile) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.file(imageFile),
+              SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  // Send the image
+                  // sendMessage(imageFile.path);
+                  uploadImage();
+                  Navigator.pop(context);
+                },
+                child: Text('Send'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+
+  // For image upload
+  Future uploadImage() async {
+    final firebaseStorageRef = FirebaseStorage.instance.ref().child('images/${DateTime.now().millisecondsSinceEpoch}.jpg');
+    final uploadTask = firebaseStorageRef.putFile(imageFile!);
+
+    uploadTask.whenComplete(() {
+      if (uploadTask.snapshot.state == TaskState.success) {
+        firebaseStorageRef.getDownloadURL().then((downloadUrl) {
+          // Handle the download URL, e.g., store it in Firestore or display it to the user
+          print('Download URL: $downloadUrl');
+
+          final firestore = FirebaseFirestore.instance;
+          firestore
+              .collection('chatrooms') // Existing collection
+              .doc(widget.topic.id) // Document ID of the current topic
+              .collection('images') // New collection for images
+              .add({
+            'imageUrl': downloadUrl,
+            'sender': widget.username,
+            'timestamp': FieldValue.serverTimestamp(),
+            'type': "image"// Set isImageMessage to true
+          })
+              .then((value) {
+            Fluttertoast.showToast(
+              msg: 'Image uploaded successfully',
+              toastLength: Toast.LENGTH_SHORT,
+              gravity: ToastGravity.BOTTOM,
+              timeInSecForIosWeb: 1,
+              backgroundColor: Colors.green,
+              textColor: Colors.white,
+            );
+          })
+              .catchError((error) {
+            print('Error storing image URL: $error');
+          });
+        });
+      }
+    }).catchError((error) {
+      // Handle any errors that occur during the upload process
+      print('Error uploading image: $error');
+    });
+  }
+
   // For Open Camera
   Future<void> openCamera() async {
     final picker = ImagePicker();
     final pickedImage = await picker.getImage(source: ImageSource.camera);
     if (pickedImage != null) {
-      final File imageFile = File(pickedImage.path);
-
-      final firebaseStorageRef = FirebaseStorage.instance.ref().child('images/${DateTime.now().millisecondsSinceEpoch}.jpg');
-      final uploadTask = firebaseStorageRef.putFile(imageFile);
-
-      uploadTask.whenComplete(() {
-        if (uploadTask.snapshot.state == TaskState.success) {
-          firebaseStorageRef.getDownloadURL().then((downloadUrl) {
-            // Handle the download URL, e.g., store it in Firestore or display it to the user
-            print('Download URL: $downloadUrl');
-
-            final firestore = FirebaseFirestore.instance;
-            firestore
-                .collection('chatrooms') // Existing collection
-                .doc(widget.topic.id) // Document ID of the current topic
-                .collection('images') // New collection for images
-                .add({
-              'imageUrl': downloadUrl,
-              'sender': widget.username,
-              'timestamp': FieldValue.serverTimestamp(),
-            })
-                .then((value) {
-              Fluttertoast.showToast(
-                msg: 'Image uploaded successfully',
-                toastLength: Toast.LENGTH_SHORT,
-                gravity: ToastGravity.BOTTOM,
-                timeInSecForIosWeb: 1,
-                backgroundColor: Colors.green,
-                textColor: Colors.white,
-              );
-            })
-                .catchError((error) {
-              print('Error storing image URL: $error');
-            });
-          });
-        }
-      }).catchError((error) {
-        // Handle any errors that occur during the upload process
-        print('Error uploading image: $error');
+      setState(() {
+        imageFile = File(pickedImage.path);
       });
+      // Open image overview dialog
+      showImageOverview(imageFile!);
     }
   }
 
-  // For image crop
-  // Future<CroppedFile?> cropImage(String imagePath) async {
-  //   final imageCropper = ImageCropper();
-  //   final croppedImage = await imageCropper.cropImage(
-  //     sourcePath: imagePath,
-  //     aspectRatio: CropAspectRatio(ratioX: 1, ratioY: 1),
-  //     androidUiSettings: AndroidUiSettings(
-  //       toolbarTitle: 'Crop Image',
-  //       toolbarColor: Colors.deepOrange,
-  //       toolbarWidgetColor: Colors.white,
-  //       initAspectRatio: CropAspectRatioPreset.original,
-  //       lockAspectRatio: false,
-  //     ),
-  //     iosUiSettings: IOSUiSettings(
-  //       title: 'Crop Image',
-  //     ),
-  //   );
-  //   return croppedImage;
-  // }
-
-
-  // Initialize the firebase
-  Future<void> initializeFirebase() async {
-    await Firebase.initializeApp();
-    _firestore = FirebaseFirestore.instance;
+  // Open gallery to select image
+  Future<void> openGallery() async {
+    final picker = ImagePicker();
+    final pickedImage = await picker.getImage(source: ImageSource.gallery);
+    if (pickedImage != null) {
+      setState(() {
+        imageFile = File(pickedImage.path);
+      });
+      // Open image overview dialog
+      showImageOverview(imageFile!);
+    }
   }
 
   // For Sending Message
@@ -123,6 +188,7 @@ class _ChatScreenState extends State<ChatScreen> {
         content: encryptedContent,
         sender: widget.username,
         timestamp: DateTime.now(),
+        type: 'text',
       );
 
       // Store the encrypted message in Firestore
@@ -219,6 +285,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     content: decryptedContent,
                     sender: data['sender'] as String,
                     timestamp: (data['timestamp'] as Timestamp).toDate(),
+                    type: 'text',
                   );
                   messages.add(message);
                 });
@@ -240,77 +307,127 @@ class _ChatScreenState extends State<ChatScreen> {
                       senderColor = generateRandomColor();
                     }
 
-                    return Align(
-                      alignment:
-                      isSender ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
+                    if (message.type == 'image') {
+                      // Display image message
+                      return Align(
+                        alignment: isSender ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
                           padding: const EdgeInsets.all(10),
                           margin: isFirstMessageFromSender
                               ? const EdgeInsets.symmetric(vertical: 5)
                               : const EdgeInsets.symmetric(vertical: 2),
-                          constraints: BoxConstraints(maxWidth: 250),
+                          constraints: const BoxConstraints(maxWidth: 250),
                           decoration: BoxDecoration(
                             color: isSender ? Colors.blue : Colors.grey.shade300,
                             borderRadius: BorderRadius.only(
-                              topLeft: isSender
-                                  ? Radius.circular(15)
-                                  : Radius.circular(
-                                  isFirstMessageFromSender ? 0 : 15),
+                              topLeft: isSender ? Radius.circular(15) : Radius.circular(isFirstMessageFromSender ? 0 : 15),
                               topRight: Radius.circular(15),
                               bottomLeft: Radius.circular(15),
-                              bottomRight: isSender
-                                  ? Radius.circular(
-                                  isFirstMessageFromSender ? 0 : 15)
-                                  : Radius.circular(15),
+                              bottomRight: isSender ? Radius.circular(isFirstMessageFromSender ? 0 : 15) : Radius.circular(15),
                             ),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black26,
-                                offset: Offset(0, 1),
-                                blurRadius: 1,
-                              ),
-                            ],
                           ),
-                          child: Column(
-                            crossAxisAlignment:
-                            isSender ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                            children: [
-                              if (shouldShowUserId)
+                          child: GestureDetector(
+                            onTap: () {
+                              // Handle image tap here
+                              // You can open a full-screen view or show a larger version of the image
+                              // For simplicity, we'll just show a toast message with the image URL
+                              Fluttertoast.showToast(
+                                msg: message.content,
+                                toastLength: Toast.LENGTH_LONG,
+                                gravity: ToastGravity.BOTTOM,
+                                timeInSecForIosWeb: 1,
+                                backgroundColor: Colors.black.withOpacity(0.7),
+                                textColor: Colors.white,
+                                fontSize: 16.0,
+                              );
+                            },
+                            child: message.content != ""? Image.network(message.content) : const CircularProgressIndicator(),
+                            // Image.network(
+                            //   // message.content,
+                            //   // fit: BoxFit.cover,
+                            //
+                            // ),
+                          ),
+                        ),
+                      );
+                    }else {
+                      return Align(
+                        alignment:
+                        isSender ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                            padding: const EdgeInsets.all(10),
+                            margin: isFirstMessageFromSender
+                                ? const EdgeInsets.symmetric(vertical: 5)
+                                : const EdgeInsets.symmetric(vertical: 2),
+                            constraints: BoxConstraints(maxWidth: 250),
+                            decoration: BoxDecoration(
+                              color: isSender ? Colors.blue : Colors.grey
+                                  .shade300,
+                              borderRadius: BorderRadius.only(
+                                topLeft: isSender
+                                    ? Radius.circular(15)
+                                    : Radius.circular(
+                                    isFirstMessageFromSender ? 0 : 15),
+                                topRight: Radius.circular(15),
+                                bottomLeft: Radius.circular(15),
+                                bottomRight: isSender
+                                    ? Radius.circular(
+                                    isFirstMessageFromSender ? 0 : 15)
+                                    : Radius.circular(15),
+                              ),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  offset: Offset(0, 1),
+                                  blurRadius: 1,
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment:
+                              isSender
+                                  ? CrossAxisAlignment.end
+                                  : CrossAxisAlignment.start,
+                              children: [
+                                if (shouldShowUserId)
+                                  Text(
+                                    message.sender,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: senderColor,
+                                    ),
+                                  ),
+                                const SizedBox(height: 2),
                                 Text(
-                                  message.sender,
+                                  message.content,
                                   style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: senderColor,
+                                    color: isSender ? Colors.white : Colors
+                                        .black,
+                                    fontSize: 16,
                                   ),
                                 ),
-                              const SizedBox(height: 2),
-                              Text(
-                                message.content,
-                                style: TextStyle(
-                                  color: isSender ? Colors.white : Colors.black,
-                                  fontSize: 16,
+                                Text(
+                                  DateFormat.jm()
+                                      .format(message.timestamp),
+                                  // Show only time
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[500],
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                DateFormat.jm()
-                                    .format(message.timestamp), // Show only time
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[500],
-                                ),
-                              ),
-                            ],
-                          )
-                      ),
-                    );
+                              ],
+                            )
+                        ),
+                      );
+                    }
                   },
                 );
               },
             ),
           ),
           Container(
-            padding: const EdgeInsets.all(5),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
               children: [
                 Expanded(
@@ -335,9 +452,9 @@ class _ChatScreenState extends State<ChatScreen> {
                         visible: !isTyping,
                         child: IconButton(
                           onPressed: () {
-                            openCamera(); // Open the camera when icon is clicked
+                            openImageDialog(); // Open Dialog Box
                           },
-                          icon: Icon(Icons.camera_alt),
+                          icon: Icon(Icons.image),
                         ),
                       ),
                     ],
