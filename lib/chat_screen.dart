@@ -53,7 +53,7 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Select Image Source'),
+          title: const Text('Select Image Source'),
           content: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -63,8 +63,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   openCamera();
                   Navigator.pop(context);
                 },
-                icon: Icon(Icons.camera),
-                label: Text('Camera'),
+                icon: const Icon(Icons.camera),
+                label: const Text('Camera'),
               ),
               ElevatedButton.icon(
                 onPressed: () {
@@ -72,8 +72,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   openGallery();
                   Navigator.pop(context);
                 },
-                icon: Icon(Icons.image),
-                label: Text('Gallery'),
+                icon: const Icon(Icons.image),
+                label: const Text('Gallery'),
               ),
             ],
           ),
@@ -92,15 +92,15 @@ class _ChatScreenState extends State<ChatScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Image.file(imageFile),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () {
                   // Send the image
                   // sendMessage(imageFile.path);
-                  uploadImage();
+                  uploadImage(imageFile.path);
                   Navigator.pop(context);
                 },
-                child: Text('Send'),
+                child: const Text('Send'),
               ),
             ],
           ),
@@ -111,7 +111,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
 
   // For image upload
-  Future uploadImage() async {
+  Future uploadImage(String file) async {
     final firebaseStorageRef = FirebaseStorage.instance.ref().child('images/${DateTime.now().millisecondsSinceEpoch}.jpg');
     final uploadTask = firebaseStorageRef.putFile(imageFile!);
 
@@ -120,6 +120,7 @@ class _ChatScreenState extends State<ChatScreen> {
         firebaseStorageRef.getDownloadURL().then((downloadUrl) {
           // Handle the download URL, e.g., store it in Firestore or display it to the user
           print('Download URL: $downloadUrl');
+
 
           final firestore = FirebaseFirestore.instance;
           firestore
@@ -272,12 +273,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   .snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
-                  return Center(child: CircularProgressIndicator());
+                  return const Center(child: CircularProgressIndicator());
                 }
 
                 messages = []; // Clear existing messages
                 final messageDocs = snapshot.data!.docs;
-                messageDocs.forEach((messageDoc) {
+                for (var messageDoc in messageDocs) {
                   final data = messageDoc.data() as Map<String, dynamic>;
                   final decryptedContent =
                   decryptContent(data['content'] as String);
@@ -288,7 +289,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     type: 'text',
                   );
                   messages.add(message);
-                });
+                }
 
                 return ListView.builder(
                   padding:
@@ -307,7 +308,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       senderColor = generateRandomColor();
                     }
 
-                    if (message.type == 'image') {
+                    if (message.content == 'image') {
                       // Display image message
                       return Align(
                         alignment: isSender ? Alignment.centerRight : Alignment.centerLeft,
@@ -320,9 +321,9 @@ class _ChatScreenState extends State<ChatScreen> {
                           decoration: BoxDecoration(
                             color: isSender ? Colors.blue : Colors.grey.shade300,
                             borderRadius: BorderRadius.only(
-                              topLeft: isSender ? Radius.circular(15) : Radius.circular(isFirstMessageFromSender ? 0 : 15),
-                              topRight: Radius.circular(15),
-                              bottomLeft: Radius.circular(15),
+                              topLeft: isSender ? const Radius.circular(15) : Radius.circular(isFirstMessageFromSender ? 0 : 15),
+                              topRight: const Radius.circular(15),
+                              bottomLeft: const Radius.circular(15),
                               bottomRight: isSender ? Radius.circular(isFirstMessageFromSender ? 0 : 15) : Radius.circular(15),
                             ),
                           ),
@@ -359,21 +360,21 @@ class _ChatScreenState extends State<ChatScreen> {
                             margin: isFirstMessageFromSender
                                 ? const EdgeInsets.symmetric(vertical: 5)
                                 : const EdgeInsets.symmetric(vertical: 2),
-                            constraints: BoxConstraints(maxWidth: 250),
+                            constraints: const BoxConstraints(maxWidth: 250),
                             decoration: BoxDecoration(
                               color: isSender ? Colors.blue : Colors.grey
                                   .shade300,
                               borderRadius: BorderRadius.only(
                                 topLeft: isSender
-                                    ? Radius.circular(15)
+                                    ? const Radius.circular(15)
                                     : Radius.circular(
                                     isFirstMessageFromSender ? 0 : 15),
-                                topRight: Radius.circular(15),
-                                bottomLeft: Radius.circular(15),
+                                topRight: const Radius.circular(15),
+                                bottomLeft: const Radius.circular(15),
                                 bottomRight: isSender
                                     ? Radius.circular(
                                     isFirstMessageFromSender ? 0 : 15)
-                                    : Radius.circular(15),
+                                    : const Radius.circular(15),
                               ),
                               boxShadow: const [
                                 BoxShadow(
@@ -454,7 +455,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           onPressed: () {
                             openImageDialog(); // Open Dialog Box
                           },
-                          icon: Icon(Icons.image),
+                          icon: const Icon(Icons.image),
                         ),
                       ),
                     ],
