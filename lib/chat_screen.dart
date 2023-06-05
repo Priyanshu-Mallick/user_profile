@@ -110,42 +110,74 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
 
+  // Show the image message on the chat screen
+  void showImageMessage(String imageUrl) {
+    Message message = Message(
+      content: imageUrl,
+      sender: widget.username,
+      timestamp: DateTime.now(),
+      type: 'image',
+    );
+
+    setState(() {
+      messages.add(message);
+    });
+  }
+
+
   // For image upload
   Future uploadImage(String file) async {
     final firebaseStorageRef = FirebaseStorage.instance.ref().child('images/${DateTime.now().millisecondsSinceEpoch}.jpg');
     final uploadTask = firebaseStorageRef.putFile(imageFile!);
 
     uploadTask.whenComplete(() {
+
+      final firestore = FirebaseFirestore.instance;
       if (uploadTask.snapshot.state == TaskState.success) {
         firebaseStorageRef.getDownloadURL().then((downloadUrl) {
           // Handle the download URL, e.g., store it in Firestore or display it to the user
           print('Download URL: $downloadUrl');
 
+          showImageMessage(downloadUrl);
 
-          final firestore = FirebaseFirestore.instance;
-          firestore
-              .collection('chatrooms') // Existing collection
-              .doc(widget.topic.id) // Document ID of the current topic
-              .collection('images') // New collection for images
-              .add({
-            'imageUrl': downloadUrl,
-            'sender': widget.username,
-            'timestamp': FieldValue.serverTimestamp(),
-            'type': "image"// Set isImageMessage to true
-          })
-              .then((value) {
-            Fluttertoast.showToast(
-              msg: 'Image uploaded successfully',
-              toastLength: Toast.LENGTH_SHORT,
-              gravity: ToastGravity.BOTTOM,
-              timeInSecForIosWeb: 1,
-              backgroundColor: Colors.green,
-              textColor: Colors.white,
+          if (downloadUrl.isNotEmpty) {
+            final encryptedContent = encryptContent(
+                downloadUrl); // Encrypt message content
+
+            Message message = Message(
+              content: encryptedContent,
+              sender: widget.username,
+              timestamp: DateTime.now(),
+              type: 'image',
             );
-          })
-              .catchError((error) {
-            print('Error storing image URL: $error');
-          });
+
+            firestore
+                .collection('chatrooms') // Existing collection
+                .doc(widget.topic.id) // Document ID of the current topic
+                .collection('messages') // New collection for images
+                .add({
+              'content': message.content,
+              'sender': message.sender,
+              'timestamp': message.timestamp,
+              'type':message.type,
+            })
+                .then((value) {
+              Fluttertoast.showToast(
+                msg: 'Image uploaded successfully',
+                toastLength: Toast.LENGTH_SHORT,
+                gravity: ToastGravity.BOTTOM,
+                timeInSecForIosWeb: 1,
+                backgroundColor: Colors.green,
+                textColor: Colors.white,
+              );
+            })
+                .catchError((error) {
+              print('Error storing image URL: $error');
+            });
+            setState(() {
+              messages.add(message);
+            });
+          }
         });
       }
     }).catchError((error) {
@@ -201,6 +233,7 @@ class _ChatScreenState extends State<ChatScreen> {
         'content': message.content,
         'sender': message.sender,
         'timestamp': message.timestamp,
+        'type':message.type,
       });
 
       setState(() {
@@ -286,7 +319,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     content: decryptedContent,
                     sender: data['sender'] as String,
                     timestamp: (data['timestamp'] as Timestamp).toDate(),
-                    type: 'text',
+                    type: data['type'],
                   );
                   messages.add(message);
                 }
@@ -308,46 +341,77 @@ class _ChatScreenState extends State<ChatScreen> {
                       senderColor = generateRandomColor();
                     }
 
-                    if (message.content == 'image') {
+                    if (message.type == 'image') {
                       // Display image message
                       return Align(
-                        alignment: isSender ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          margin: isFirstMessageFromSender
-                              ? const EdgeInsets.symmetric(vertical: 5)
-                              : const EdgeInsets.symmetric(vertical: 2),
-                          constraints: const BoxConstraints(maxWidth: 250),
-                          decoration: BoxDecoration(
-                            color: isSender ? Colors.blue : Colors.grey.shade300,
-                            borderRadius: BorderRadius.only(
-                              topLeft: isSender ? const Radius.circular(15) : Radius.circular(isFirstMessageFromSender ? 0 : 15),
-                              topRight: const Radius.circular(15),
-                              bottomLeft: const Radius.circular(15),
-                              bottomRight: isSender ? Radius.circular(isFirstMessageFromSender ? 0 : 15) : Radius.circular(15),
-                            ),
-                          ),
-                          child: GestureDetector(
-                            onTap: () {
-                              // Handle image tap here
-                              // You can open a full-screen view or show a larger version of the image
-                              // For simplicity, we'll just show a toast message with the image URL
-                              Fluttertoast.showToast(
-                                msg: message.content,
-                                toastLength: Toast.LENGTH_LONG,
-                                gravity: ToastGravity.BOTTOM,
-                                timeInSecForIosWeb: 1,
-                                backgroundColor: Colors.black.withOpacity(0.7),
-                                textColor: Colors.white,
-                                fontSize: 16.0,
-                              );
-                            },
-                            child: message.content != ""? Image.network(message.content) : const CircularProgressIndicator(),
-                            // Image.network(
-                            //   // message.content,
-                            //   // fit: BoxFit.cover,
-                            //
-                            // ),
+                        alignment:
+                        isSender ? Alignment.centerRight : Alignment.centerLeft,
+                        child: GestureDetector(
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (_) => AlertDialog(
+                                content: Image.network(message.content), // Show the image in the dialog
+                              ),
+                            );
+                          },
+                          child: Container(
+                              padding: const EdgeInsets.all(10),
+                              margin: isFirstMessageFromSender
+                                  ? const EdgeInsets.symmetric(vertical: 5)
+                                  : const EdgeInsets.symmetric(vertical: 2),
+                              constraints: const BoxConstraints(maxWidth: 250),
+                              decoration: BoxDecoration(
+                                color: isSender ? Colors.blue : Colors.grey
+                                    .shade300,
+                                borderRadius: BorderRadius.only(
+                                  topLeft: isSender
+                                      ? const Radius.circular(15)
+                                      : Radius.circular(
+                                      isFirstMessageFromSender ? 0 : 15),
+                                  topRight: const Radius.circular(15),
+                                  bottomLeft: const Radius.circular(15),
+                                  bottomRight: isSender
+                                      ? Radius.circular(
+                                      isFirstMessageFromSender ? 0 : 15)
+                                      : const Radius.circular(15),
+                                ),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    offset: Offset(0, 1),
+                                    blurRadius: 1,
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment:
+                                isSender
+                                    ? CrossAxisAlignment.end
+                                    : CrossAxisAlignment.start,
+                                children: [
+                                  if (shouldShowUserId)
+                                    Text(
+                                      message.sender,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: senderColor,
+                                      ),
+                                    ),
+                                  const SizedBox(height: 2),
+                                  message.content != ""? Image.network(message.content) : const CircularProgressIndicator(),
+                                  Text(
+                                    DateFormat.jm()
+                                        .format(message.timestamp),
+                                    // Show only time
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[500],
+                                    ),
+                                  ),
+                                ],
+                              )
                           ),
                         ),
                       );
@@ -355,6 +419,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       return Align(
                         alignment:
                         isSender ? Alignment.centerRight : Alignment.centerLeft,
+
                         child: Container(
                             padding: const EdgeInsets.all(10),
                             margin: isFirstMessageFromSender
